@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Il mio calendario turni</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    body {
+      background-color: #f0f0f0;
+      padding-top: 70px;
+    }
+
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background: linear-gradient(to bottom, #f0f0f0 50%, rgba(240,240,240,0));
+      padding: 16px 0;
+      text-align: center;
+      z-index: 100;
+    }
+
+    h1 {
+      color: black;
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .month-container {
+      margin-bottom: 30px;
+      padding: 0 10px;
+    }
+
+    .month-title {
+      text-align: center;
+      margin: 20px 0 15px;
+      font-weight: 600;
+      color: #333;
+      font-size: 1.1rem;
+    }
+
+    .week-row {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+
+    .day-cell {
+      width: 52px;
+      height: 62px;
+      background: white;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      cursor: pointer;
+      overflow: hidden;
+      transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .day-cell:hover {
+      transform: scale(1.04);
+    }
+
+    .day-cell.squish {
+      transform: scale(0.88);
+    }
+
+    .day-cell.morning-afternoon {
+      background: linear-gradient(to bottom, #FFD700 50%, #FFA500 50%);
+    }
+
+    .day-cell.holiday {
+      background-color: #FFD700;
+      animation: holidayGlow 2s ease-in-out infinite;
+    }
+
+    @keyframes holidayGlow {
+      0%, 100% {
+        box-shadow: 0 0 8px 2px rgba(255, 215, 0, 0.5),
+                    0 0 16px 4px rgba(255, 215, 0, 0.3);
+      }
+      50% {
+        box-shadow: 0 0 14px 4px rgba(255, 215, 0, 0.8),
+                    0 0 28px 8px rgba(255, 215, 0, 0.5),
+                    0 0 40px 12px rgba(255, 215, 0, 0.2);
+      }
+    }
+
+    .day-number {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 5px 0;
+      color: #222;
+      text-align: left;
+      position: relative;
+      z-index: 2;
+    }
+
+    .day-shift-label {
+      font-size: 9px;
+      font-weight: 500;
+      padding: 0 4px 3px;
+      color: #222;
+      text-align: center;
+      margin-top: auto;
+      position: relative;
+      z-index: 2;
+    }
+
+    .day-star {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1;
+    }
+
+    .morning { background-color: #FFD700; }
+    .afternoon { background-color: #FFA500; }
+    .night { background-color: #E53935; }
+    .smonto { background-color: #4169E1; }
+    .rest { background-color: #D3D3D3; }
+
+    .buttons-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin: 20px auto 30px;
+      width: min(calc(7 * 52px + 6 * 4px), calc(100% - 20px));
+    }
+
+    .action-button {
+      height: 42px;
+      background: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      color: #333;
+      transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.15s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      text-transform: lowercase;
+    }
+
+    .action-button:hover {
+      background: #fafafa;
+      transform: scale(1.02);
+    }
+
+    .action-button.squish {
+      transform: scale(0.95);
+    }
+
+    .note-button {
+      flex: 3;
+    }
+
+    .pdf-button {
+      flex: 1;
+    }
+
+    .blur-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(240, 240, 240, 0.3);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 999;
+      opacity: 0;
+      animation: fadeIn 0.2s ease forwards;
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    .custom-dropdown {
+      position: fixed;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+      padding: 10px;
+      z-index: 1000;
+      min-width: 170px;
+      opacity: 0;
+      transform: scale(0.9) translateY(-8px);
+      animation: dropdownIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    @keyframes dropdownIn {
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    .dropdown-item {
+      display: flex;
+      align-items: center;
+      padding: 7px 10px;
+      cursor: pointer;
+      border-radius: 6px;
+      margin-bottom: 3px;
+      transition: background 0.15s, transform 0.15s;
+    }
+
+    .dropdown-item:hover {
+      background: rgba(0,0,0,0.08);
+      transform: translateX(3px);
+    }
+
+    .dropdown-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .color-preview {
+      width: 50px;
+      height: 22px;
+      border-radius: 4px;
+      margin-right: 10px;
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    .color-preview.holiday-preview::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 13px;
+      color: #333;
+    }
+
+    .color-preview.ma-preview {
+      background: linear-gradient(to right, #FFD700 50%, #FFA500 50%);
+    }
+
+    .dropdown-label {
+      font-size: 12px;
+      color: #333;
+    }
+
+    .color-morning { background-color: #FFD700; }
+    .color-afternoon { background-color: #FFA500; }
+    .color-night { background-color: #E53935; }
+    .color-smonto { background-color: #4169E1; }
+    .color-rest { background-color: #D3D3D3; }
+    .color-holiday { background-color: #FFD700; }
+
+    .note-modal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.9);
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 12px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+      padding: 20px;
+      z-index: 1001;
+      width: 90%;
+      max-width: 420px;
+      opacity: 0;
+      animation: modalIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    @keyframes modalIn {
+      to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+      }
+    }
+
+    .note-modal-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #222;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .note-modal-text-display {
+      width: 100%;
+      min-height: 140px;
+      padding: 12px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 14px;
+      color: #333;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      cursor: text;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.8);
+      border: 1px solid transparent;
+      transition: background 0.15s;
+    }
+
+    .note-modal-text-display:hover {
+      background: #f9f9f9;
+    }
+
+    .note-modal-text-display.empty {
+      color: #999;
+      font-style: italic;
+    }
+
+    .note-modal-textarea {
+      width: 100%;
+      min-height: 140px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 14px;
+      resize: vertical;
+      outline: none;
+      background: rgba(255,255,255,0.8);
+      transition: border-color 0.15s;
+      display: none;
+    }
+
+    .note-modal-textarea.active {
+      display: block;
+    }
+
+    .note-modal-textarea:focus {
+      border-color: #4169E1;
+    }
+
+    .note-modal-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+      justify-content: flex-end;
+    }
+
+    .note-btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s, opacity 0.15s;
+    }
+
+    .note-btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .note-btn-save {
+      background: #4169E1;
+      color: white;
+    }
+
+    .note-btn-cancel {
+      background: #e0e0e0;
+      color: #333;
+    }
+
+    .confirm-modal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.9);
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 12px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+      padding: 24px;
+      z-index: 1002;
+      width: 90%;
+      max-width: 380px;
+      opacity: 0;
+      animation: modalIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    .confirm-modal-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #222;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    .confirm-modal-text {
+      font-size: 0.9rem;
+      color: #555;
+      text-align: center;
+      margin-bottom: 20px;
+      line-height: 1.4;
+    }
+
+    .confirm-modal-buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .confirm-btn {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+
+    .confirm-btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .confirm-btn-update {
+      background: #4169E1;
+      color: white;
+    }
+
+    .confirm-btn-keep {
+      background: #e0e0e0;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Il mio calendario turni</h1>
+  </header>
+
+  <div id="calendar"></div>
+
+  <script>
+    // Reset di tutte le note salvate in localStorage all'avvio
+    Object.keys(localStorage).filter(k => k.startsWith('note_')).forEach(k => localStorage.removeItem(k));
+
+    const shiftSequence = ['morning', 'afternoon', 'night', 'smonto', 'rest'];
+    
+    const shiftLabels = {
+      'morning': 'mattina',
+      'afternoon': 'pomeriggio',
+      'night': 'notte',
+      'smonto': 'smonto',
+      'rest': 'riposo',
+      'holiday': 'ferie',
+      'morning-afternoon': 'mattina+pom'
+    };
+
+    const shiftColors = {
+      'morning': '#FFD700',
+      'afternoon': '#FFA500',
+      'night': '#E53935',
+      'smonto': '#4169E1',
+      'rest': '#D3D3D3',
+      'holiday': '#FFD700',
+      'morning-afternoon': null
+    };
+
+    const monthNames = [
+      "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
+      "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"
+    ];
+
+    let currentYear = 2026;
+    let currentMonth = 8;
+
+    let audioCtx = null;
+    function playPopSound() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.1);
+      
+      gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+      
+      oscillator.start(audioCtx.currentTime);
+      oscillator.stop(audioCtx.currentTime + 0.12);
+    }
+
+    function getDaysInMonth(year, month) {
+      return new Date(year, month + 1, 0).getDate();
+    }
+
+    function getFirstDayOfMonth(year, month) {
+      const day = new Date(year, month, 1).getDay();
+      return (day + 6) % 7;
+    }
+
+    function getNoteKey(year, month) {
+      return `note_${year}_${month}`;
+    }
+
+    function getCurrentShift(cell) {
+      if (cell.classList.contains('morning-afternoon')) return 'morning-afternoon';
+      if (cell.classList.contains('holiday')) return 'holiday';
+      for (let shift of shiftSequence) {
+        if (cell.classList.contains(shift)) return shift;
+      }
+      return null;
+    }
+
+    function renderCalendar() {
+      const container = document.getElementById('calendar');
+      container.innerHTML = '';
+
+      for (let m = 0; m < 16; m++) {
+        const year = currentYear + Math.floor((currentMonth + m) / 12);
+        const month = (currentMonth + m) % 12;
+
+        const daysInMonth = getDaysInMonth(year, month);
+        const firstDay = getFirstDayOfMonth(year, month);
+
+        const monthDiv = document.createElement('div');
+        monthDiv.className = 'month-container';
+        monthDiv.innerHTML = `<div class="month-title">${monthNames[month]} ${year}</div>`;
+
+        let dayCounter = 1 - firstDay;
+
+        for (let week = 0; week < Math.ceil((firstDay + daysInMonth) / 7); week++) {
+          const weekRow = document.createElement('div');
+          weekRow.className = 'week-row';
+
+          for (let d = 0; d < 7; d++) {
+            const dayCell = document.createElement('div');
+            dayCell.className = 'day-cell';
+
+            if (dayCounter > 0 && dayCounter <= daysInMonth) {
+              dayCell.dataset.day = dayCounter;
+              dayCell.dataset.month = month;
+              dayCell.dataset.year = year;
+
+              const dayNum = document.createElement('div');
+              dayNum.className = 'day-number';
+              dayNum.textContent = dayCounter;
+              dayCell.appendChild(dayNum);
+
+              const shiftLabel = document.createElement('div');
+              shiftLabel.className = 'day-shift-label';
+              dayCell.appendChild(shiftLabel);
+
+              dayCell.addEventListener('click', handleCellClick);
+            }
+
+            weekRow.appendChild(dayCell);
+            dayCounter++;
+          }
+          monthDiv.appendChild(weekRow);
+        }
+
+        const buttonsRow = document.createElement('div');
+        buttonsRow.className = 'buttons-row';
+
+        const noteBtn = document.createElement('button');
+        noteBtn.className = 'action-button note-button';
+        noteBtn.textContent = 'note';
+        noteBtn.dataset.year = year;
+        noteBtn.dataset.month = month;
+        noteBtn.addEventListener('click', handleNoteClick);
+        buttonsRow.appendChild(noteBtn);
+
+        const pdfBtn = document.createElement('button');
+        pdfBtn.className = 'action-button pdf-button';
+        pdfBtn.textContent = 'pdf';
+        pdfBtn.dataset.year = year;
+        pdfBtn.dataset.month = month;
+        pdfBtn.addEventListener('click', handlePdfClick);
+        buttonsRow.appendChild(pdfBtn);
+
+        monthDiv.appendChild(buttonsRow);
+        container.appendChild(monthDiv);
+      }
+    }
+
+    function handleCellClick(e) {
+      e.stopPropagation();
+      const target = e.currentTarget;
+      target.classList.add('squish');
+      setTimeout(() => target.classList.remove('squish'), 150);
+      playPopSound();
+      setTimeout(() => openDropdown(target), 80);
+    }
+
+    function handleNoteClick(e) {
+      e.stopPropagation();
+      const btn = e.currentTarget;
+      btn.classList.add('squish');
+      setTimeout(() => btn.classList.remove('squish'), 150);
+      playPopSound();
+      setTimeout(() => openNoteModal(btn.dataset.year, btn.dataset.month), 80);
+    }
+
+    function handlePdfClick(e) {
+      e.stopPropagation();
+      const btn = e.currentTarget;
+      btn.classList.add('squish');
+      setTimeout(() => btn.classList.remove('squish'), 150);
+      playPopSound();
+      setTimeout(() => generatePdf(btn.dataset.year, btn.dataset.month), 80);
+    }
+
+    function generatePdf(year, month) {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF('portrait', 'mm', 'a4');
+      
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const margin = 15;
+      const usableWidth = pageWidth - 2 * margin;
+
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text('Il mio calendario turni', pageWidth / 2, 20, { align: 'center' });
+
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${monthNames[month]} ${year}`, pageWidth / 2, 32, { align: 'center' });
+
+      const daysInMonth = getDaysInMonth(year, month);
+      const firstDay = getFirstDayOfMonth(year, month);
+
+      const cellWidth = 24;
+      const cellHeight = 14;
+      const gap = 2;
+      const calendarWidth = 7 * cellWidth + 6 * gap;
+      const startX = margin + (usableWidth - calendarWidth) / 2;
+      const startY = 42;
+      const cornerRadius = 2;
+
+      let dayCounter = 1 - firstDay;
+
+      for (let week = 0; week < Math.ceil((firstDay + daysInMonth) / 7); week++) {
+        for (let d = 0; d < 7; d++) {
+          const x = startX + d * (cellWidth + gap);
+          const y = startY + week * (cellHeight + gap);
+
+          if (dayCounter > 0 && dayCounter <= daysInMonth) {
+            const cell = document.querySelector(
+              `.day-cell[data-year="${year}"][data-month="${month}"][data-day="${dayCounter}"]`
+            );
+            const shift = cell ? getCurrentShift(cell) : null;
+
+            if (shift === 'morning-afternoon') {
+              doc.setFillColor(255, 215, 0);
+              doc.roundedRect(x, y, cellWidth, cellHeight / 2, cornerRadius, cornerRadius, 'F');
+              doc.setFillColor(255, 165, 0);
+              doc.roundedRect(x, y + cellHeight / 2, cellWidth, cellHeight / 2, cornerRadius, cornerRadius, 'F');
+            } else if (shift && shiftColors[shift]) {
+              const color = shiftColors[shift];
+              const r = parseInt(color.slice(1, 3), 16);
+              const g = parseInt(color.slice(3, 5), 16);
+              const b = parseInt(color.slice(5, 7), 16);
+              doc.setFillColor(r, g, b);
+              doc.roundedRect(x, y, cellWidth, cellHeight, cornerRadius, cornerRadius, 'F');
+            } else {
+              doc.setFillColor(255, 255, 255);
+              doc.roundedRect(x, y, cellWidth, cellHeight, cornerRadius, cornerRadius, 'F');
+            }
+
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.2);
+            doc.roundedRect(x, y, cellWidth, cellHeight, cornerRadius, cornerRadius, 'S');
+
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(34, 34, 34);
+            doc.text(dayCounter.toString(), x + 1, y + 4);
+
+            if (shift && shift !== 'holiday') {
+              doc.setFontSize(6);
+              doc.setFont('helvetica', 'normal');
+              const label = shiftLabels[shift] || '';
+              doc.text(label, x + cellWidth / 2, y + cellHeight - 2, { align: 'center' });
+            }
+
+            if (shift === 'holiday') {
+              doc.setFontSize(10);
+              doc.setTextColor(51, 51, 51);
+              doc.text('✦', x + cellWidth / 2, y + cellHeight / 2 + 1, { align: 'center' });
+            }
+          } else {
+            doc.setFillColor(255, 255, 255);
+            doc.roundedRect(x, y, cellWidth, cellHeight, cornerRadius, cornerRadius, 'F');
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.2);
+            doc.roundedRect(x, y, cellWidth, cellHeight, cornerRadius, cornerRadius, 'S');
+          }
+
+          dayCounter++;
+        }
+      }
+
+      const legendY = pageHeight - 60;
+      const legendX = margin;
+      const legendItemHeight = 6;
+      const legendItemWidth = 12;
+      const legendGap = 3;
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(34, 34, 34);
+      doc.text('Legenda:', legendX, legendY);
+
+      const legendItems = [
+        { label: 'Mattina', color: '#FFD700' },
+        { label: 'Pomeriggio', color: '#FFA500' },
+        { label: 'Notte', color: '#E53935' },
+        { label: 'Smonto', color: '#4169E1' },
+        { label: 'Riposo', color: '#D3D3D3' },
+        { label: 'Ferie', color: '#FFD700', star: true },
+        { label: 'Mattina+Pom', color: 'gradient' }
+      ];
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+
+      legendItems.forEach((item, index) => {
+        const itemY = legendY + 8 + index * (legendItemHeight + legendGap);
+        
+        if (item.color === 'gradient') {
+          doc.setFillColor(255, 215, 0);
+          doc.rect(legendX, itemY, legendItemWidth / 2, legendItemHeight, 'F');
+          doc.setFillColor(255, 165, 0);
+          doc.rect(legendX + legendItemWidth / 2, itemY, legendItemWidth / 2, legendItemHeight, 'F');
+        } else {
+          const r = parseInt(item.color.slice(1, 3), 16);
+          const g = parseInt(item.color.slice(3, 5), 16);
+          const b = parseInt(item.color.slice(5, 7), 16);
+          doc.setFillColor(r, g, b);
+          doc.rect(legendX, itemY, legendItemWidth, legendItemHeight, 'F');
+        }
+
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.2);
+        doc.rect(legendX, itemY, legendItemWidth, legendItemHeight);
+
+        if (item.star) {
+          doc.setFontSize(8);
+          doc.setTextColor(51, 51, 51);
+          doc.text('✦', legendX + legendItemWidth / 2, itemY + legendItemHeight / 2 + 1, { align: 'center' });
+        }
+
+        doc.setFontSize(8);
+        doc.setTextColor(34, 34, 34);
+        doc.text(item.label, legendX + legendItemWidth + 3, itemY + legendItemHeight / 2 + 1);
+      });
+
+      const noteKey = getNoteKey(year, month);
+      const noteText = localStorage.getItem(noteKey) || '';
+      
+      const noteX = pageWidth / 2 + 5;
+      const noteY = legendY;
+      const noteWidth = pageWidth - noteX - margin;
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(34, 34, 34);
+      doc.text('Note:', noteX, noteY);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+
+      if (noteText === '') {
+        doc.setTextColor(180, 180, 180);
+        doc.text('Nessuna nota', noteX, noteY + 8);
+      } else {
+        doc.setTextColor(34, 34, 34);
+        const splitText = doc.splitTextToSize(noteText, noteWidth);
+        doc.text(splitText, noteX, noteY + 8);
+      }
+
+      doc.save(`calendario_${monthNames[month]}_${year}.pdf`);
+    }
+
+    function openDropdown(target) {
+      document.querySelectorAll('.custom-dropdown').forEach(d => d.remove());
+      document.querySelectorAll('.blur-overlay').forEach(o => o.remove());
+
+      const overlay = document.createElement('div');
+      overlay.className = 'blur-overlay';
+      overlay.addEventListener('click', closeAll);
+      document.body.appendChild(overlay);
+
+      const dropdown = document.createElement('div');
+      dropdown.className = 'custom-dropdown';
+
+      const shifts = ['morning', 'afternoon', 'night', 'smonto', 'rest', 'holiday', 'morning-afternoon'];
+      
+      shifts.forEach(shift => {
+        const item = document.createElement('div');
+        item.className = 'dropdown-item';
+        
+        const colorPreview = document.createElement('div');
+        colorPreview.className = `color-preview color-${shift}`;
+        if (shift === 'holiday') colorPreview.classList.add('holiday-preview');
+        if (shift === 'morning-afternoon') colorPreview.classList.add('ma-preview');
+        
+        const label = document.createElement('div');
+        label.className = 'dropdown-label';
+        label.textContent = shiftLabels[shift] || 'ferie';
+        
+        item.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          handleShiftSelection(target, shift);
+          closeAll();
+        });
+        
+        item.appendChild(colorPreview);
+        item.appendChild(label);
+        dropdown.appendChild(item);
+      });
+
+      const rect = target.getBoundingClientRect();
+      let left = rect.left;
+      let top = rect.bottom + 5;
+      
+      if (left + 170 > window.innerWidth) left = window.innerWidth - 180;
+      if (top + 280 > window.innerHeight + window.scrollY) top = rect.top - 280;
+      
+      dropdown.style.left = left + 'px';
+      dropdown.style.top = top + 'px';
+
+      document.body.appendChild(dropdown);
+    }
+
+    function handleShiftSelection(cell, newShift) {
+      const existingShift = getCurrentShift(cell);
+      
+      if (!existingShift || existingShift === newShift) {
+        applyShift(cell, newShift);
+        return;
+      }
+      
+      showConfirmModal(cell, newShift, existingShift);
+    }
+
+    function showConfirmModal(cell, newShift, oldShift) {
+      document.querySelectorAll('.confirm-modal').forEach(m => m.remove());
+      document.querySelectorAll('.blur-overlay').forEach(o => o.remove());
+
+      const overlay = document.createElement('div');
+      overlay.className = 'blur-overlay';
+      document.body.appendChild(overlay);
+
+      const modal = document.createElement('div');
+      modal.className = 'confirm-modal';
+
+      const title = document.createElement('div');
+      title.className = 'confirm-modal-title';
+      title.textContent = 'Cambio turno';
+      modal.appendChild(title);
+
+      const text = document.createElement('div');
+      text.className = 'confirm-modal-text';
+      text.textContent = `Vuoi aggiornare i giorni successivi o mantenere la turnazione?`;
+      modal.appendChild(text);
+
+      const buttonsDiv = document.createElement('div');
+      buttonsDiv.className = 'confirm-modal-buttons';
+
+      const updateBtn = document.createElement('button');
+      updateBtn.className = 'confirm-btn confirm-btn-update';
+      updateBtn.textContent = 'Aggiorna il mese';
+      updateBtn.addEventListener('click', () => {
+        applyShift(cell, newShift);
+        closeModal();
+      });
+
+      const keepBtn = document.createElement('button');
+      keepBtn.className = 'confirm-btn confirm-btn-keep';
+      keepBtn.textContent = 'Mantieni la turnazione';
+      keepBtn.addEventListener('click', () => {
+        applyShiftOnly(cell, newShift);
+        closeModal();
+      });
+
+      buttonsDiv.appendChild(updateBtn);
+      buttonsDiv.appendChild(keepBtn);
+      modal.appendChild(buttonsDiv);
+
+      document.body.appendChild(modal);
+
+      overlay.addEventListener('click', closeModal);
+
+      function closeModal() {
+        modal.remove();
+        overlay.remove();
+      }
+    }
+
+    function applyShiftOnly(cell, shift) {
+      setCellShift(cell, shift);
+      playPopSound();
+    }
+
+    function openNoteModal(year, month) {
+      document.querySelectorAll('.note-modal').forEach(m => m.remove());
+      document.querySelectorAll('.custom-dropdown').forEach(d => d.remove());
+      document.querySelectorAll('.blur-overlay').forEach(o => o.remove());
+
+      const currentNoteKey = getNoteKey(year, month);
+      const savedText = localStorage.getItem(currentNoteKey) || '';
+      let isEditing = false;
+
+      const overlay = document.createElement('div');
+      overlay.className = 'blur-overlay';
+      document.body.appendChild(overlay);
+
+      const modal = document.createElement('div');
+      modal.className = 'note-modal';
+
+      const title = document.createElement('div');
+      title.className = 'note-modal-title';
+      title.textContent = 'Note';
+      modal.appendChild(title);
+
+      const textDisplay = document.createElement('div');
+      textDisplay.className = 'note-modal-text-display' + (savedText === '' ? ' empty' : '');
+      textDisplay.textContent = savedText === '' ? 'Nessuna nota. Clicca per scrivere.' : savedText;
+      modal.appendChild(textDisplay);
+
+      const textarea = document.createElement('textarea');
+      textarea.className = 'note-modal-textarea';
+      textarea.value = savedText;
+      textarea.placeholder = 'Scrivi qui le tue note...';
+      modal.appendChild(textarea);
+
+      const buttonsDiv = document.createElement('div');
+      buttonsDiv.className = 'note-modal-buttons';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'note-btn note-btn-cancel';
+      cancelBtn.textContent = 'Annulla';
+
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'note-btn note-btn-save';
+      saveBtn.textContent = 'Salva nota';
+
+      buttonsDiv.appendChild(cancelBtn);
+      buttonsDiv.appendChild(saveBtn);
+      modal.appendChild(buttonsDiv);
+
+      document.body.appendChild(modal);
+
+      function enterEditMode() {
+        if (isEditing) return;
+        isEditing = true;
+        textDisplay.style.display = 'none';
+        textarea.classList.add('active');
+        textarea.focus();
+        playPopSound();
+      }
+
+      function exitEditMode() {
+        isEditing = false;
+        textarea.value = savedText;
+        textarea.classList.remove('active');
+        textDisplay.style.display = 'block';
+      }
+
+      textDisplay.addEventListener('click', enterEditMode);
+
+      cancelBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        exitEditMode();
+      });
+
+      saveBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const newText = textarea.value;
+        localStorage.setItem(currentNoteKey, newText);
+        
+        textDisplay.textContent = newText === '' ? 'Nessuna nota. Clicca per scrivere.' : newText;
+        textDisplay.className = 'note-modal-text-display' + (newText === '' ? ' empty' : '');
+        
+        exitEditMode();
+        playPopSound();
+      });
+
+      overlay.addEventListener('click', () => {
+        if (isEditing) {
+          exitEditMode();
+        }
+        modal.remove();
+        overlay.remove();
+      });
+    }
+
+    function closeAll() {
+      document.querySelectorAll('.custom-dropdown').forEach(d => d.remove());
+      document.querySelectorAll('.blur-overlay').forEach(o => o.remove());
+    }
+
+    function setCellShift(cell, shift) {
+      cell.className = 'day-cell';
+      const existingStar = cell.querySelector('.day-star');
+      if (existingStar) existingStar.remove();
+
+      const shiftLabelEl = cell.querySelector('.day-shift-label');
+
+      if (shift === 'morning-afternoon') {
+        cell.classList.add('morning-afternoon');
+        shiftLabelEl.textContent = 'mattina+pom';
+      } else if (shift === 'holiday') {
+        cell.classList.add('holiday');
+        shiftLabelEl.textContent = '';
+        const star = document.createElement('div');
+        star.className = 'day-star';
+        star.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24">
+          <path d="M12 2 L14 9 L21 9 L15.5 13.5 L17.5 21 L12 16.5 L6.5 21 L8.5 13.5 L3 9 L10 9 Z" 
+                fill="#333" stroke="#333" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round"/>
+        </svg>`;
+        cell.appendChild(star);
+      } else if (shiftSequence.includes(shift)) {
+        cell.classList.add(shift);
+        shiftLabelEl.textContent = shiftLabels[shift];
+      } else {
+        shiftLabelEl.textContent = '';
+      }
+    }
+
+    function applyShift(cell, shift) {
+      setCellShift(cell, shift);
+      recalculateFrom(cell, shift);
+      playPopSound();
+    }
+
+    function recalculateFrom(cell, shift) {
+      const day = parseInt(cell.dataset.day);
+      const month = parseInt(cell.dataset.month);
+      const year = parseInt(cell.dataset.year);
+      
+      let effectiveShift = shift;
+      if (shift === 'morning-afternoon') {
+        effectiveShift = 'afternoon';
+      }
+      
+      if (!shiftSequence.includes(effectiveShift)) return;
+      
+      const daysInMonth = getDaysInMonth(year, month);
+      const shiftIndex = shiftSequence.indexOf(effectiveShift);
+      
+      for (let d = day + 1; d <= daysInMonth; d++) {
+        const nextShiftIndex = (shiftIndex + (d - day)) % 5;
+        const nextShift = shiftSequence[nextShiftIndex];
+        
+        const nextCell = document.querySelector(
+          `.day-cell[data-year="${year}"][data-month="${month}"][data-day="${d}"]`
+        );
+        
+        if (nextCell) {
+          setCellShift(nextCell, nextShift);
+        }
+      }
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.custom-dropdown') && 
+          !e.target.closest('.day-cell') &&
+          !e.target.closest('.note-modal') &&
+          !e.target.closest('.confirm-modal') &&
+          !e.target.closest('.action-button')) {
+        closeAll();
+      }
+    });
+
+    renderCalendar();
+  </script>
+</body>
+</html>
